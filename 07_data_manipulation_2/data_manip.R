@@ -24,9 +24,10 @@
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(purrr)
 
 # Set working directory ----
-setwd("07_data_vis_2")
+setwd("07_data_manipulation_2")
 
 # Load data ----
 trees <- read.csv("trees.csv", header=TRUE)
@@ -157,7 +158,7 @@ levels(trees.genus$Height.cat)  # new order and levels
 
 # 4. Advanced piping ----
 
-# subset data to containfewer genera
+# subset data to contain fewer genera
 trees.five <- trees.genus %>% 
   filter(Genus %in% c("Acer", "Fraxinus", "Salix", "Aesculus", "Pinus"))
 
@@ -177,42 +178,156 @@ trees.five <- trees.genus %>%
 # provided as data = . where needed
 
 # map for each genus
-tree.plots <- trees.five %>% 
-  group_by(Genus) %>% 
-  do(plots =  # the plotting call for do function
-       ggplot(data = .) +
-       geom_point(aes(x = Easting, y = Northing, 
-                      size = Height.cat), alpha = 0.5) +
-       labs(title = paste("Map of", .$Genus, "at Craigmillar Castle",
-                          sep = " ")) +
-       theme_bw() +
-       theme(panel.grid = element_blank(),
-             axis.text = element_text(size = 14),
-             legend.text = element_text(size = 12),
-             plot.title = element_text(hjust = 0.5),  # centre title
-             legend.position = "bottom")
-       )
+# tree.plots <- trees.five %>% 
+#   group_by(Genus) %>% 
+#   do(plots =  # the plotting call for do function
+#        ggplot(data = .) +
+#        geom_point(aes(x = Easting, y = Northing, 
+#                       size = Height.cat), alpha = 0.5) +
+#        labs(title = paste("Map of", .$Genus, "at Craigmillar Castle",
+#                           sep = " ")) +
+#        theme_bw() +
+#        theme(panel.grid = element_blank(),
+#              axis.text = element_text(size = 14),
+#              legend.text = element_text(size = 12),
+#              plot.title = element_text(hjust = 0.5),  # centre title
+#              legend.position = "bottom")
+#        )
+# 
+# tree.plots$plots  # show plots
+# # tree.plots object where plots saved as lists within plots column created
+# # do() function allows external functions to be used in pipes BUT tricky 
+# # and being depreciated
+# 
+# # save plots to file
+# tree.plots %>% 
+#   do(., ggsave(.$plots, 
+#                filename = paste(getwd(), "/", "map-", .$Genus, ".png", sep = ""),
+#                device = "png", height = 12, width = 16, units = "cm"))
 
 
-tree.plots$plots  # show plots
-# tree.plots object where plots saved as lists within plots column created
-# do() function allows extrenal functions to be used in pipes BUT tricky 
-# and being depreciated
-
-# save plots to file
-tree.plots %>% 
-  do(., ggsave(.$plots, 
-               filename = paste(getwd(), "/", "map-", .$Genus, ".png", sep = ""),
-               device = "png", height = 12, width = 16, units = "cm"))
-
+# SINCE do() BEING DEPRECIATED - use below instead for same result!
 # alternative purr package to save files
-# UP TO HERE  - LOOK AT PURR PAGE! (then Sticking things together with paste())
+# see https://www.brodrigues.co/blog/2017-03-29-make-ggplot2-purrr/ for explanation
+
+# map2 from purrr
+
+tree_plots <- trees.five %>%
+  group_by(Genus) %>%
+  nest() %>%
+  mutate(plot = map2(data, Genus, ~ggplot(data = .) + 
+                       geom_point(aes(x = Easting, y = Northing, 
+                                      size = Height.cat), alpha = 0.5) +
+                       labs(title = paste("Map of", Genus, "at Craigmillar Castle",
+                                          sep = " ")) +
+                       theme_bw() +
+                       theme(panel.grid = element_blank(),
+                             axis.text = element_text(size = 14),
+                             legend.text = element_text(size = 12),
+                             plot.title = element_text(hjust = 0.5),
+                             legend.position = "bottom")))
+print(tree_plots)
+
+map2(paste0(getwd(), "/", "map-", tree_plots$Genus, ".png", sep = ""),
+     tree_plots$plot, ggsave, device = "png", height = 12, width = 16, units = "cm")
 
 
+# Sticking things together with paste()
+# equivalent of f strings in python
+ # see above file paths to save plots and plot titles for egs
 
 
+# 5. Challenge yourself! ----
+
+# The Craigmillar Castle team would like a summary of the different species 
+# found within its grounds, but broken down in four quadrants (NE, NW, SE, SW).
+# You can start from the trees.genus object created earlier.
+
+# Can you calculate the species richness (e.g. the number of different species) 
+# in each quadrant?
+
+# They would also like to know how abundant the genus Acer is (as a % of the 
+# total number of trees) in each quadrant.
+
+# Finally, they would like, for each quadrant separately, a bar plot showing 
+# counts of Acer trees in the different age classes, ordered so they read from
+# Young (lumping together juvenile and semi-mature trees), Middle Aged,
+# and Mature.
+
+vertical_centre <- (max(trees.genus$Northing) + min(trees.genus$Northing)) / 2
+horizontal_centre <- (max(trees.genus$Easting) + min(trees.genus$Easting)) / 2
+
+trees.genus <- trees.genus %>%
+  mutate(Quadrant = case_when(
+    Northing <= vertical_centre & Easting <= horizontal_centre ~ "SW",
+    Northing <= vertical_centre & Easting > horizontal_centre ~ "SE",
+    Northing > vertical_centre & Easting <= horizontal_centre ~ "NW",
+    Northing > vertical_centre & Easting > horizontal_centre ~ "NE"
+  ))
+    
+# Check quadrant assignment successful
+# map trees according to quadrant
+(map.all <- ggplot(trees.genus) +
+    geom_point(aes(x = Easting, y = Northing, 
+                   size = Height.cat, colour = Quadrant), alpha = 0.5) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(size = 12),
+          legend.text = element_text(size = 12))
+)
+
+# species richness per quadrant
+quad_summary <- trees.genus %>% 
+  group_by(Quadrant) %>% 
+  summarise(count = length(CommonName),
+            spp_richness = length(unique(LatinName)))
 
 
+# Acer abundance
+acer_abund <- trees.genus %>% 
+  group_by(Quadrant, Genus) %>% 
+  tally() %>%  # count no of trees of each genus
+  group_by(Quadrant) %>% 
+  mutate(total = sum(n)) %>%  # calculate total no of trees per quadrant
+  filter(Genus == "Acer") %>%   # only keep acers
+  mutate(acer_percent = n / total * 100) %>% 
+  dplyr::select(-Genus)
+
+# plot percentage of acers in each quadrant
+ggplot(acer_abund) +
+  geom_col(aes(x = Quadrant, y = acer_percent)) +
+  labs(x = 'Quadrant', y = '% Proportion of Acer') +
+  theme_bw()
 
 
+# bar plots of acer by age category
+
+acers <- trees.genus %>% 
+  filter(Genus == "Acer")
+
+acers$AgeGroup <- factor(acers$AgeGroup,
+                        levels = c('Juvenile', 'Semi-mature', 'Middle Aged', 'Mature'),
+                        labels = c('Young', 'Young', 'Middle Aged', 'Mature'))
+
+levels(acers$AgeGroup)
+
+acer_plots <- acers %>%
+  group_by(Quadrant) %>%
+  nest() %>%
+  mutate(plot = map2(data, Quadrant, ~ggplot(data = .) + 
+                       geom_bar(aes(x = AgeGroup)) +
+                       labs(title = paste("Age Distribution of Acers in", Quadrant, "of Craigmillar Castle",
+                                          sep = " "), x = 'Age group', y = 'Number of trees') +
+                       theme_bw() +
+                       theme(panel.grid = element_blank(),
+                             axis.text = element_text(size = 14),
+                             legend.text = element_text(size = 12),
+                             plot.title = element_text(hjust = 0.5),
+                             legend.position = "bottom")))
+
+
+print(acer_plots)
+
+map2(paste0(getwd(), "/", "acers-", acer_plots$Quadrant, ".png", sep = ""),
+     acer_plots$plot, ggsave, device = "png", height = 12, width = 16, units = "cm")
 
