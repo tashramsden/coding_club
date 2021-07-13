@@ -300,6 +300,16 @@ ggplot(acer_abund) +
   theme_bw()
 
 
+# reorder to descending % order
+acer_abund2 <- acer_abund
+acer_abund2$Quadrant <- reorder(acer_abund3$Quadrant, -acer_abund$acer_percent)
+
+ggplot(acer_abund2) +
+  geom_col(aes(x = Quadrant, y = acer_percent)) +
+  labs(x = 'Quadrant', y = '% Proportion of Acer') +
+  theme_bw()
+
+
 # bar plots of acer by age category
 
 acers <- trees.genus %>% 
