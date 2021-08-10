@@ -528,10 +528,36 @@ theme_coding <- function(){  # creating a new theme function
 
 # 6. Challenge ----
 
+# using % endemism (below), plot species richness as bar plot, coloured 
+# w shade representing % of endemism
 
+# and order bars in order of endemism, from low to high %
 
+more_magic <- more_magic %>% 
+  mutate(endemic = c(0.54, 0.32, 0.66, 0.80, 0.14, 0.24, 0.39))
 
+more_magic$endemic <- more_magic$endemic * 100
 
+# simple plot
+(endemism_bar <- ggplot(more_magic, aes(x = land, y = counts, fill = endemic)) +
+    geom_histogram(stat = "identity"))
+
+# customised
+(endemism_bar <- ggplot(more_magic, aes(x = reorder(land, endemic),  # reorder by endemism in-line
+                                        y = counts, fill = endemic)) +
+    geom_histogram(stat = "identity") +
+    scale_fill_gradient(name = "% Endemism \n",
+                        low = "#a1d99b",
+                        high = "#31a354") +
+    labs(title = "Species Richness and Endemism in Magical Lands\n", 
+         x = "Magical Land", y = "Species Richness\n") +
+    theme_coding() +
+    theme(legend.position = "right",
+          legend.title = element_text(size = 12),
+          plot.title = element_text(size = 14)))
+
+ggsave("images/magical_land_sp_rich_endemism.png", 
+       width = 8, height = 5, dpi = 300)
 
 
 
