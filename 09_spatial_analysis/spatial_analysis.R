@@ -5,6 +5,18 @@
 #                                                               #
 #################################################################
 
+
+# Tutorial Summary ----
+#   Import GeoTIFF file as raster in R.
+#   Extract layers from multi-layer raster objects and get raster properties.
+#   Explore raster visualisation of single and mutil-layered objects with
+#     rasterVis, ggplot and base R.
+#   Explore raster manipulations by calculating and plotting the NDVI 
+#     ratio of the pixels in an image.
+#   Perform unsupervised image classification using kmeans algorithm
+#     to cluster pixels in 10 clusters.
+
+
 # Data info (from Coding Club) ----
 # Satellite data of the Loch Tay area of Scotland, available 
 # from https://scihub.copernicus.eu/
@@ -102,7 +114,7 @@ compareRaster(b2, b3)
 # plot function only plots 100,000 pixels, but image stretches the view
 
 ## if Error in plot.new() : figure margins too large -> 
-## par(mar=c(5.1, 4.1, 4.1, 2.1))
+# par(mar=c(5.1, 4.1, 4.1, 2.1))
 
 image(b8)
 
@@ -234,3 +246,147 @@ plot(s_tay)
 
 # 3. Manipulate rasters: NDVI and KMN classification ----
 
+# a. NDVI: Normalised difference vegetation index ----
+# widely used veg index that quantifies veg presence, health/structure
+# calculated using near infrared (NIR) and red bandwidth of em
+# healthy veg reflects strongly in NIR, absorbs in red bandwidth for phtosynth
+# high ratio between light reflected in NIR and red potentially represents 
+# areas of  healthy veg
+# (diff plants absorb red light at diff rates, same plant absorbs diff parts of
+# red depending on whether healthy/stressed/time of year)
+# often used over large areas as indication of land cover change
+
+# NDVI = (NIR - Red) / (NIR + Red)
+# eg NDVI < 0.2 not likely dominated w veg, > 0.6 likely dense veg
+
+# in Sentinel 2: band 8 = NIR, band 4 = Red
+# calculate NDVI by creating function and using raster maths operations:
+
+# vegetation index function
+VI <- function(img, k, i) {
+  bk <- img[[k]]
+  bi <- img[[i]]
+  vi <- (bk - bi) / (bk + bi)
+  return(vi)
+}
+
+# apply function to raster brick created earlier
+ndvi <- VI(s_tay, 8, 4)
+
+# ndvi plot
+png("images/ndviplot.png", width = 4, height = 4, units = "in", res = 300)
+plot(ndvi, col = rev(terrain.colors(10)),
+     main = "Sentinel 2, Loch Tay-NDVI")
+dev.off()
+
+# create histogram of pixel NDVI values to see distribution
+png("images/ndvihist.png", width = 4, height = 4, units = "in", res = 300)
+hist(ndvi,
+     main = "Distribution of NDVI values",
+     xlab = "NDVI",
+     ylab = "Frequency",
+     col = "aquamarine3",
+     xlim = c(-0.5, 1),
+     breaks = 30,
+     xaxt = "n")
+axis(side = 1, at = seq(-0.5, 1, 0.05), labels = seq(-0.5, 1, 0.05))
+dev.off()
+
+# hist strongly skewed to right - high NDVI - indicates highly vegetated areas
+
+# we know area has lots of veg, now mask pixels w NDVI <0.4 (less likely veg) 
+# to highlight where veg areas are
+png("images/ndvimask.png", width = 4, height = 4, units = "in", res = 300)
+# reclassify values between negative infinity and 0.4 as NAs
+veg <- reclassify(ndvi, cbind(-Inf, 0.4, NA))  
+plot(veg, main = "Vegetation Cover")
+dev.off()
+# lots of high veg cover, expected in area of Scotland
+
+
+# b. Save rasters ----
+# might want to save raster not just plots, eg for further use in R or to 
+# export and use in QGIS
+
+# use writeraster function
+# saves data as integers not floats (less memory and processing)
+writeRaster(x = ndvi,
+            filename="sentinel2_raster/tay_ndvi_2018.tif",
+            format = "GTiff",
+            # save as INTEGER rather than float
+            datatype = "INT2S")
+
+
+# c. KMN: kmeans ----
+
+# raster operations allow unsupervised (no training data for clustering)
+# classification (clustering of pixels) in the satellite image
+
+# this useful when not a lot known about an area
+
+# eg below using kmeans algorithm - groups pixels w similar spectral properties
+# in same cluster 
+
+# will create 10 clusters using NDVI raster:
+
+# first, convert ndvi raster into an array
+nr <- getValues(ndvi)
+str(nr)
+
+# important to set the seed generator because `kmeans` initiates the 
+# centres in random locations - the seed generator generates random numbers
+set.seed(99)
+
+# create 10 clusters, allow 500 iterations, start w 5 random sets using
+# "Lloyd" method
+kmncluster <- kmeans(na.omit(nr), centers = 10, iter.max = 500,
+                     nstart = 5, algorithm  = "Lloyd")
+
+# kmeans retruns an object of class "kmeans"
+str(kmncluster)
+
+# kmeans returns object w 9 elements
+# length of cluster element in kmncluster is 429936 (same as length nr)
+# cell values of kmncluster$cluster range between 1 and 10 corresponding to
+# input no. of clusters provided in kmeans() function
+# kmncluster$cluster indicates cluster label for the corresponding pixel
+
+# visualise results 
+# convert kmncluster$cluster array back to RasterLayer of same dims as ndvi object:
+
+# create copy of ndvi layer
+knr <- ndvi
+
+# replace raster cell values w kmncluster$cluster array
+knr[] <- kmncluster$cluster
+
+# Alternative way to achieve the same result
+# values(knr) <- kmncluster$cluster
+
+knr
+# RasterLayer w 429936 cells 
+# don't know which cluster (1-10) belongs to what land cover/veg type
+
+# one way to attribute class to land cover is to plot cluster next to reference 
+# layer of land cover & use unique colours for each cluster
+# don't have ref layer for this area so use NDVI map/RGB plot
+
+# NDVI next to Kmeans
+png('images/ndvi_kmeans.png', width = 10, height = 8, units = "in", res = 300)
+par(mar = c(10.8, 5, 10.8, 2), mfrow = c(1, 2))
+plot(ndvi, col = rev(terrain.colors(10)),
+     main = "NDVI")
+plot(knr, main = "Kmeans", col = viridis_pal(option = "D")(10))
+dev.off()
+
+# RGB next to Kmeans
+png('images/rgb_kmeans.png', width = 10, height = 8, units = "in", res = 300)
+par(mar = c(10.8, 5, 10.8, 2), mfrow = c(1, 2))
+plotRGB(tayRGB, axes = TRUE, stretch = "lin", main = "RGB")
+plot(knr, main = "Kmeans", yaxt = 'n', col = viridis_pal(option = "D")(10))
+dev.off()
+
+# this simple classification gives an idea of land cover types
+# eg (colours will vary with new kmncluster)
+# can deduce which cluster is water (covers the loch) 
+# and which is likely to be forest (high NDVI ratio & looks forested on RGB)
