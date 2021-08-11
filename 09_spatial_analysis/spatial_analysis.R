@@ -5,7 +5,7 @@
 #                                                               #
 #################################################################
 
-# Data info ----
+# Data info (from Coding Club) ----
 # Satellite data of the Loch Tay area of Scotland, available 
 # from https://scihub.copernicus.eu/
 
@@ -60,7 +60,7 @@ setwd("09_spatial_analysis")
 tay <- raster("data/taycrop.tif")
 
 
-# 1. Explore raster data
+# 1. Explore raster data ----
 
 # get properties
 tay
@@ -100,10 +100,10 @@ compareRaster(b2, b3)
 
 # can plot the bands using plot/images functions
 # plot function only plots 100,000 pixels, but image stretches the view
-# if Error in plot.new() : figure margins too large -> 
-# par(mar=c(5.1, 4.1, 4.1, 2.1))
 
-plot(b8)
+## if Error in plot.new() : figure margins too large -> 
+## par(mar=c(5.1, 4.1, 4.1, 2.1))
+
 image(b8)
 
 plot(b8)
@@ -116,8 +116,9 @@ cropped_tay <- crop(b7, e)
 plot(cropped_tay)
 
 
-# 2. Visualise Spectral Bands
+# 2. Visualise Spectral Bands ----
 
+# a. viridis ----
 # bands can be plotted w diff colour palettes, eg viridis, to improve vis
 # and save:
 png("images/tayplot.png", width = 4, height = 4,
@@ -131,5 +132,105 @@ image(b8, col = viridis_pal(option="D")(10),
       main = "Sentinel 2 Image of Loch Tay")
 
 
+# b. RGB ----
+# red-green-blue plot of a multi-layered object for more realistic rendition
+# layers/bands represent different bandwidths in visible em spectrum 
+# (corresponding to red, blue and green) combined -> naturalistic colour 
+# rendition of the earth surface.
 
+# first, create raster stack:
+# (multi-layered raster object, of the red(b4), green(b3) and blue(b2) bands)
+
+# this code specifies how we want to save the plot
+png('images/RGB.png', width = 5, height = 4, units = "in", res = 300)
+tayRGB <- stack(list(b4, b3, b2))  # creates raster stack
+plotRGB(tayRGB, axes = TRUE, stretch = "lin", 
+        main = "Sentinel RGB colour composite")
+dev.off()
+
+# to just view and not save
+tayRGB <- stack(list(b4, b3, b2))
+plotRGB(tayRGB, axes = TRUE, stretch = "lin",
+        main = "Sentinel RGB colour composite")
+
+
+# c. FCC - false colour positive ----
+# red, green, and blue bands replaced to accentuate vegetation
+
+# In FCC, red band replaced by near infrared band (band 8 in Sentinel 2),
+# the green band by red, and the blue band by green. 
+# -> creates an image where the vegetation stands out in red. 
+# (help(plotRGB)) for more information and other arguments for the function
+
+# rasterVis package provides ways to enhance vis and analysis of raster data:
+# https://oscarperpinan.github.io/rastervis/
+# levelplot function allows level and contour plots to be made of raster 
+# objects with elevation data, such as LIDAR, and plot3D allows 3D mapping. 
+
+# don't have elevation data from Sentinel 2, but the package’s gplot 
+# function allows plotting of a uni or multivariate raster object using
+# ggplot2-like syntax.
+
+# basic
+gplot(b8) +
+  geom_raster(aes(x = x, y = y, fill = value))
+
+# better
+gplot(b8) +
+  geom_raster(aes(x = x, y = y, fill = value)) +  # value is specific value (reflectance) of each pixel
+  scale_fill_viridis_c(name = "Reflectance") +
+  coord_quickmap() +
+  ggtitle("West of Loch Tay, raster plot") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+# save plot
+ggsave("images/ggtay.png", scale = 1.8, dpi = 300)
+
+# visualise all the bands together:
+# use facet_wrap in gplot, first create stack of all bands (on top of each other)
+t <- stack(b1,b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12)
+
+# faceted plots:
+gplot(t) +
+  geom_raster(aes(x = x, y = y, fill = value)) +
+  scale_fill_viridis_c(name = "Reflectance") +
+  facet_wrap(~variable) +
+  coord_quickmap()+
+  ggtitle("Sentinel 2 Loch Tay, raster plots") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  theme_classic() +
+  theme(text = element_text(size=20),
+        axis.text.x = element_text(angle = 90, hjust = 1)) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("images/allbands.png", scale = 2, dpi = 300)
+
+# or for quick visualisation, original file can be loaded as raster brick 
+# and plotted using ‘plot’.
+s_tay <- brick('data/taycrop.tif')
+plot(s_tay)
+
+# NOTICE: difference in colour and range of legend between the different bands
+# Different earth surfaces reflect the solar radiation differently and each
+# raster layer represents how much incident solar radiation is reflected at 
+# a particular wavelength bandwidth. 
+
+# Bands 6 to 9 are in the Near Infrared Range (NIR). Vegetation reflects more
+# NIR than other wavelengths but water absorbs NIR, therefore the lighter areas
+# with high reflectance values are likely to be vegetation and the dark blue,
+# low reflectance value areas, likely to be water. Also note that the 
+# Sentinel 2 bands have 3 levels of spatial resolution, 10 m, 20 m, and 
+# 60 m:
+# 10 m resolution band 2, band 3, band 4 and band 8
+# 20 m resolution band 5, band 6, band 7, band 11 and band 12
+# 60 m resolution band 1, band 9 and band 10
+
+
+# 3. Manipulate rasters: NDVI and KMN classification ----
 
