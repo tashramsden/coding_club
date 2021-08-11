@@ -311,7 +311,7 @@ dev.off()
 # use writeraster function
 # saves data as integers not floats (less memory and processing)
 writeRaster(x = ndvi,
-            filename="sentinel2_raster/tay_ndvi_2018.tif",
+            filename="data/tay_ndvi_2018.tif",
             format = "GTiff",
             # save as INTEGER rather than float
             datatype = "INT2S")
