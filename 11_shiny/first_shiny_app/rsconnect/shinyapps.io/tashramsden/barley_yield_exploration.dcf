@@ -1,0 +1,13 @@
+name: barley_yield_exploration
+title: barley_yield_exploration
+username:
+account: tashramsden
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4565342
+bundleId: 4985078
+url: https://tashramsden.shinyapps.io/barley_yield_exploration/
+when: 1630421510.46816
+lastSyncTime: 1630421510.46816
+asMultiple: FALSE
+asStatic: FALSE

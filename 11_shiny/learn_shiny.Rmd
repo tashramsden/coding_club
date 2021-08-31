@@ -1,0 +1,308 @@
+---
+title: "Shiny"
+author: "Tash Ramsden"
+date: "12/08/2021"
+output: html_document
+---
+
+## Shiny Uses
+
+* Interactive data visualisation for presentations and websites
+* Sharing results with collaborators
+* Communicating science in an accessible way
+* Bridging the gap between R users and non-R users
+* See some examples [here](https://shiny.rstudio.com/gallery/)
+
+
+## Set-up
+
+Run the following to set up Shiny in RStudio:
+
+* `install.packages("shiny")`
+* `install.packages("rsconnect")  # For publishing apps online`
+* `install.packages("agridat")  # For the dataset in today's tutorial`
+
+
+## Shiny app file structure
+
+Create the Shiny app file:
+
+* *File/New File/Shiny Web App...*
+* Application type: *Single File (app.R)*
+* Name of app assigned to dir (not the app script file - called app.R)
+* (Shiny apps can be made with 2 files: ui.R and server.R as well)
+
+Inside the app directory:
+
+* Create a folder called **Data** - to hold data!
+* Create a folder called **www** - to hold any images/other web elements
+
+
+## app.R Layout
+
+**A basic app.R contains these 5 parts:**
+
+1. A section at the top loading packages needed for the app 
+    + **`library(shiny)`**
+    + `shiny` is required
+2. A section to load any data
+    + **`Barley <- as.data.frame(beaven.barley)`**
+3. An object called `ui` containing info about app layout in the browser
+    + **`ui <- fluidPage()`**
+    + `fluidpage()` defines a layout that resizes according to window size (is responsive)
+    + All the app code will be placed inside the brackets
+4. A `server` object containing info about app computation, plotting, tables, maps etc
+    + **`server <- function(input, output) {}`**
+    + All the app code will be placed inside the curly brackets
+5. A command to run the app
+    + **`shinyApp(ui = ui, server = server)`**
+    + Should be at the top of `app.R`
+    + Tells shiny that the user interface comes from `ui` and server info (data, plots, tables, etc) comes from `server`
+
+
+## Shiny App Layout
+
+Shiny apps are structured using panels which can contain text, widgets, plots, tables, maps, images, etc.
+
+* Some [layout examples](https://shiny.rstudio.com/articles/layout-guide.html)
+* Most basic: fluidRow() and column() to manually create grids
+* sidebarLayout() creates large panel and smaller inset side panel
+
+
+## Basic Syntax for Creating a Shiny App
+
+
+### Define a layout within `ui`, e.g:
+
+```{r, eval=FALSE}
+ui <- 
+    fluidPage(
+        titlePanel(""),
+        sidebarLayout(
+            sidebarPanel(),
+            mainPanel()
+        )
+    )
+```
+
+* `titlePanel()` indicates that we would like a separate panel at the top of the page in which we can put the title.
+* `sidebarLayout()` indicates that we want our Shiny app to have the sidebar layout, one of many layouts we saw above. Within sidebarLayout we have:
+* `sidebarPanel()` indicates that we want a sidebar panel included in our app. Sidebar panels often contain input widgets like sliders, text input boxes, radio buttons etc.
+* `mainPanel()` indicates that we want a larger main panel. Main panels often contain the output of the app, whether it is a table, map, plot or something else.
+
+
+### Input Widgets
+
+Once the basic structure is defined, add inputs and outputs to `ui`, e.g:
+
+```{r, eval=FALSE}
+ui <- fluidPage(
+  titlePanel("Barley Yield"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(inputId = "gen",  # Give the input a name "genotype"
+      label = "1. Select genotype",  # Give the input a label to be displayed in the app
+      choices = c("A" = "a","B" = "b","C" = "c","D" = "d","E" = "e","F" = "f","G" = "g","H" = "h"), selected = "a"),  # Create the choices that can be selected. e.g. Display "A" and link to value "a"
+      # Or: choices = unique(Barley$gen)
+    selectInput(inputId = "colour", 
+      label = "2. Select histogram colour", 
+      choices = c("blue","green","red","purple","grey"), selected = "grey"),
+    sliderInput(inputId = "bin", 
+      label = "3. Select number of histogram bins", 
+      min=1, max=25, value= c(10)),
+    textInput(inputId = "text", 
+      label = "4. Enter some text to be displayed", "")
+    ),
+  mainPanel()
+  )
+)
+```
+
+* For help with understanding the arguments for input widgets use the help function `?`, e.g. `?textInput`
+* Other widgets, e.g. radio buttons, action buttons, etc
+
+
+## Running a Shiny App
+
+**Click *Run App* ** or **`Ctrl + Alt + R`**
+
+Stop the app by pressing *Stop* button or `Esc`
+
+
+## Output
+
+Without outputs the app doesn't tell us anything - outputs can be plots, tables, maps, etc
+
+Create outputs by placing code inside the curly brackets `{}` in `server`, e.g:
+
+```{r, eval=FALSE}
+server <- function(input, output) {
+  output$plot <- renderPlot(ggplot(Barley, aes(x = yield)) +  # Create object called `output$plot` with a ggplot inside it
+  geom_histogram(bins = 7,  # Add a histogram to the plot
+    fill = "grey",  # Make the fill colour grey
+    data = Barley,  # Use data from `Barley`
+    colour = "black")  # Outline the bins in black
+  )          
+}
+```
+
+* Created an object called output$plot and used `renderPlot()` to wrap a `ggplot()` command.
+
+
+## Reactive output
+
+Need to link the input widgets to the output object so that it is interactive.
+
+1. Update `server` with new reactive output arguments:
+
+```{r, eval=FALSE}
+
+server <- function(input, output) {
+  output$plot <- renderPlot(ggplot(Barley, aes(x = yield)) +
+  geom_histogram(bins = 7,
+      fill = "grey",
+      data = Barley[Barley$gen == input$gen,],
+      colour = "black")
+  )                                                       
+}
+
+```
+
+* `data = Barley[Barley$gen == input$gen,]` means only use data where value in column `gen` is equal to value given by `input$gen`, all rows selected (just filter columns)
+
+2. Update histogram colour based on value of colour input:
+
+```{r, eval=FALSE}
+
+      fill = input$colour
+
+```
+
+3. Select number of bins in histogram:
+
+```{r, eval=FALSE}
+
+      bins = input$bin
+
+```
+
+4. Finally, create a table output showing some summary stats for the selected parameters.
+
+* Create new output object `output$table` in `server` and use `renderTable()` to create the table made using dplyr `summarise()`:
+
+
+```{r, eval=FALSE}
+
+server <- function(input, output) {
+  output$myhist <- renderPlot(ggplot(Barley, aes(x = yield))   + 
+  	geom_histogram(bins = input$bin, fill = input$col,   group=input$gen, 
+  		data=Barley[Barley$gen == input$gen,],
+    		colour = "black"))
+  
+  output$mytext <- renderText(input$text)
+  
+  output$mytable <- renderTable(Barley %>%
+  filter(gen == input$gen) %>%
+  summarise("Mean" = mean(yield), 
+    	"Median" = median(yield),
+    	"STDEV" = sd(yield), 
+    	"Min" = min(yield),
+    	"Max" = max(yield)))
+}
+
+```
+
+
+## Displaying Output
+
+Need to make outputs appear on app in `mainPanel` - add to `ui` object inside `mainPanel`:
+
+```{r, eval=FALSE}
+
+    mainPanel(
+      plotOutput("plot"),
+      tableOutput("table"),
+      textOutput("text")
+    )
+
+```
+
+*At this point, preview the app - it's all working!*
+
+## Additional elements
+
+### HTML
+
+Like a normal HTML webpage, HTML tags can be added to shiny apps, e.g:
+
+| HTML  | Shiny                                 | Function                                |
+|-------|---------------------------------------|-----------------------------------------|
+|`<div>`|`tags$div()`                           |Defines block with consistent formatting |
+|`<br>` |`tags$br()`                            |Inserts break                            |
+|`<hr>` |`tags$hr()`                            |Inserts horizontal line                  |
+|`<p>`  |`tags$p()`                             |Creates paragraph of text                |
+|`<a>`  |`tags$a(href="LINK", "displayed text")`|Creates clickable link                   |
+
+
+* Find list of all HTML tags using `shiny::tags`
+
+* Some tags can conflict with other functions so should always state the source by using `tags$`
+
+* Tags can be stacked as in HTML:
+
+```{r, eval=FALSE}
+
+tags$div(style="color:red",
+  tags$p("Visit us at:"),
+  tags$a(href = "https://ourcodingclub.github.io", "Coding Club")
+  )
+
+```
+
+* Above creates a block of text that is red, the block contains a paragraph saying "Visit us at:", and a link to the Coding Club website (add above code into `mainPanel()` to view!)
+
+For more Shiny arguments see [RStudio wiki](https://shiny.rstudio.com/articles/tag-glossary.html)
+
+
+## Exporting a finished app
+
+### As a GitHub repository
+
+It's easy to share Shiny apps with people who have RStudio:
+
+* Easiest way is to send app.R (w any data, resources) in a zip file to be unzipped by recipient and run through R:
+
+* Can quickly share over the internet using Github:
+
+  + Create repo and upload everything from app folder (including any `Data` and `www` folders)
+  
+  + Add README.md 
+  
+  + Give recipient Github username and name of app repo
+  
+  + Get them to run `runGithub()` in R: `runGithub(repo = "repo_name", username = "user_name")`
+
+* Alternatively (if recipient doesn't know how Github works) upload folder as `.zip` file to Github (or any other file-hosting service) and they can use `runUrl()` if given the url of the zipfile, eg: `runUrl("https://github.com/rstudio/shiny_example/archive/master.zip")`
+
+
+### As a shinyapps.io app
+
+Shiny apps can be hosted on [www.shinyapps.io](www.shinyapps.io), a web hosting
+platform by RStudio for SHiny apps.
+
+* Sign up on their website
+* Then go to [www.shinyapps.io/admin/#/tokens](www.shinyapps.io/admin/#/tokens), 
+click Show secret and copy the rsconnect account info
+* Run this code in R to link shinyapps.io with R Studio
+* To upload your app, open your app.R and click the publish button. Select a 
+name for your app (no spaces) and click Publish.
+* The app can then be launched by anyone with the URL (can be found by going ot shinyapps.io and opening app info from dashboard)
+
+* To embed an app that is hosted by `shinyapps.io` in your own website you can put it in an `iframe`, replacing the URL with your own app URL and altering the style arguments to your own desire:
+
+```{r eval=FALSE}
+
+<iframe src="https://johngodlee.shinyapps.io/barley_yield_exploration/" style="border:none;width:1000px;height:500px;"></iframe>
+
+```
+
